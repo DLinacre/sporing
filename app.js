@@ -900,8 +900,9 @@ function renderNearYou() {
     fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pc)}`)
       .then(r => r.json())
       .then(j => {
-        if (j && j.result && j.result[0]) {
-          setLoc(j.result[0].latitude, j.result[0].longitude, pc);
+        const r = j && j.result ? (Array.isArray(j.result) ? j.result[0] : j.result) : null;
+        if (r && r.latitude != null) {
+          setLoc(r.latitude, r.longitude, r.postcode || pc);
         } else toast('Postcode not found');
       })
       .catch(() => toast('Postcode lookup failed — check connection'));
