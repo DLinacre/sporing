@@ -41,8 +41,11 @@
     <section id="mapWrap" aria-label="Map of England">
       <svg id="map" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
         <g id="world">
+          <g id="tileLayer"></g>
           <path id="land" fill="#efe7cf" stroke="#8a9a7b" stroke-width="1.4" stroke-linejoin="round"/>
           <g id="hexLayer"></g>
+          <g id="ringLayer"></g>
+          <g id="inatLayer"></g>
           <g id="spotLayer"></g>
           <g id="homeMarker"></g>
         </g>
@@ -51,6 +54,7 @@
       <div id="zoomCtl">
         <button id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
         <button id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+        <button id="btnTiles" class="on" title="Street map (OpenStreetMap)" aria-label="Toggle street map">🗺️</button>
         <button id="zoomHome" title="Centre on Barnsley" aria-label="Centre on Barnsley">⌂</button>
       </div>
 
@@ -60,6 +64,7 @@
         <div class="cap" id="legendCap">—</div>
       </div>
 
+      <div id="tileCredit" class="hidden">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors · Verified finds: <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a></div>
       <div id="addBanner" class="hidden">Tap the map to drop your find pin</div>
       <div id="hexTip" class="hidden"></div>
       <div id="toast" class="hidden"></div>
