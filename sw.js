@@ -1,5 +1,6 @@
-/* Sporing service worker — offline app shell */
-const CACHE = 'sporing-v2';
+/* Sporing service worker — offline app shell + offline street tiles */
+const CACHE = 'sporing-v3';
+const TILES = 'sporing-tiles-v1';
 const ASSETS = [
   './',
   'index.html',
@@ -24,7 +25,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== TILES).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -33,6 +34,27 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+
+  /* OpenStreetMap street tiles: cache-first, bounded */
+  if (url.hostname === 'tile.openstreetmap.org') {
+    e.respondWith(
+      caches.open(TILES).then(async c => {
+        const hit = await c.match(req);
+        if (hit) return hit;
+        const res = await fetch(req);
+        if (res && res.ok) {
+          c.put(req, res.clone());
+          const keys = await c.keys();
+          if (keys.length > 160) {
+            await Promise.all(keys.slice(0, keys.length - 160).map(k => c.delete(k)));
+          }
+        }
+        return res;
+      }).catch(() => fetch(req))
+    );
+    return;
+  }
+
   if (url.origin !== self.location.origin) return;
   e.respondWith(
     caches.match(req).then(hit => {
