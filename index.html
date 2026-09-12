@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Sporing — a seasonal foraging chance map for England's edible wild fungi. Default home: Barnsley, South Yorkshire. Log your own finds.">
+  <meta name="theme-color" content="#2f5233">
+  <title>Sporing — England Fungi Map</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f5233'/%3E%3Cpath d='M32 12c-13 0-21 9-21 17 0 1.6 1.2 3 2.9 3h36.2c1.7 0 2.9-1.4 2.9-3 0-8-8-17-21-17z' fill='%23cf3f2e'/%3E%3Ccircle cx='23' cy='22' r='2.6' fill='%23fff4e0'/%3E%3Ccircle cx='37' cy='19' r='2.2' fill='%23fff4e0'/%3E%3Ccircle cx='44' cy='25' r='2' fill='%23fff4e0'/%3E%3Cpath d='M25 33h14l-2 16c-.3 2.4-2.3 4-4.8 4h-2.4c-2.5 0-4.5-1.6-4.8-4z' fill='%23f2e8d5'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Sporing">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg class="logo" width="36" height="36" viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="#2f5233"/>
+        <path d="M32 12c-13 0-21 9-21 17 0 1.6 1.2 3 2.9 3h36.2c1.7 0 2.9-1.4 2.9-3 0-8-8-17-21-17z" fill="#cf3f2e"/>
+        <circle cx="23" cy="22" r="2.6" fill="#fff4e0"/>
+        <circle cx="37" cy="19" r="2.2" fill="#fff4e0"/>
+        <circle cx="44" cy="25" r="2" fill="#fff4e0"/>
+        <path d="M25 33h14l-2 16c-.3 2.4-2.3 4-4.8 4h-2.4c-2.5 0-4.5-1.6-4.8-4z" fill="#f2e8d5"/>
+      </svg>
+      <div>
+        <h1>Sporing</h1>
+        <p>England foraging chance map</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="btnGuide" class="icon-btn" title="Field guide" aria-label="Field guide">📖</button>
+      <button id="btnInfo" class="icon-btn" title="How it works" aria-label="How it works">?</button>
+      <button id="btnAdd" class="btn primary">+ Log a find</button>
+    </div>
+  </header>
+
+  <main id="layout">
+    <section id="mapWrap" aria-label="Map of England">
+      <svg id="map" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <g id="world">
+          <path id="land" fill="#efe7cf" stroke="#8a9a7b" stroke-width="1.4" stroke-linejoin="round"/>
+          <g id="hexLayer"></g>
+          <g id="spotLayer"></g>
+          <g id="homeMarker"></g>
+        </g>
+      </svg>
+
+      <div id="zoomCtl">
+        <button id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+        <button id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+        <button id="zoomHome" title="Centre on Barnsley" aria-label="Centre on Barnsley">⌂</button>
+      </div>
+
+      <div id="legend">
+        <div class="bar"></div>
+        <div class="lbl"><span>Low chance</span><span>High</span></div>
+        <div class="cap" id="legendCap">—</div>
+      </div>
+
+      <div id="addBanner" class="hidden">Tap the map to drop your find pin</div>
+      <div id="hexTip" class="hidden"></div>
+      <div id="toast" class="hidden"></div>
+
+      <div id="spotCard" class="hidden"></div>
+    </section>
+
+    <aside id="panel">
+      <div class="sec-title" id="monthTitle">Season</div>
+      <div id="monthStrip"></div>
+
+      <div class="sec-title" id="picksTitle">Best picks</div>
+      <div id="picks"></div>
+
+      <div class="sec-title">Choose a mushroom</div>
+      <div id="speciesList"></div>
+
+      <div id="detail"></div>
+
+      <div class="sec-title">Near you — closest places</div>
+      <div id="nearYou"></div>
+
+      <div class="sec-title">Your finds <span id="findCount"></span></div>
+      <div id="findsList"></div>
+    </aside>
+  </main>
+
+  <form id="spotForm" class="hidden" autocomplete="off">
+    <h3 id="formTitle">Log your find</h3>
+    <div class="loc" id="formLoc">—</div>
+    <label for="fDate">Date found</label>
+    <input type="date" id="fDate" required>
+    <label for="fNote">Note (optional)</label>
+    <input type="text" id="fNote" maxlength="90" placeholder="e.g. under birch stump, damp corner">
+    <label>How confident in the ID?</label>
+    <div id="confSeg">
+      <button type="button" data-c="1">Low</button>
+      <button type="button" data-c="2" class="on">Medium</button>
+      <button type="button" data-c="3">High</button>
+    </div>
+    <div class="fbtns">
+      <button type="button" class="btn" id="fCancel">Cancel</button>
+      <button type="submit" class="btn primary">Save find</button>
+    </div>
+  </form>
+  <div id="formBack" class="hidden"></div>
+
+  <dialog id="infoDlg">
+    <div class="dlg">
+      <h2>
+        <svg width="26" height="26" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="14" fill="#2f5233"/>
+          <path d="M32 12c-13 0-21 9-21 17 0 1.6 1.2 3 2.9 3h36.2c1.7 0 2.9-1.4 2.9-3 0-8-8-17-21-17z" fill="#cf3f2e"/>
+          <circle cx="23" cy="22" r="2.6" fill="#fff4e0"/><circle cx="37" cy="19" r="2.2" fill="#fff4e0"/><circle cx="44" cy="25" r="2" fill="#fff4e0"/>
+          <path d="M25 33h14l-2 16c-.3 2.4-2.3 4-4.8 4h-2.4c-2.5 0-4.5-1.6-4.8-4z" fill="#f2e8d5"/>
+        </svg>
+        About Sporing
+      </h2>
+      <p>A foraging chance map for <b>England</b>. Pick a mushroom and a month — the hex map shows where that species is most likely to be fruiting, based on the season, typical habitat and climate. Your home pin is <b>Barnsley, South Yorkshire</b>.</p>
+      <h4>How the chance is calculated</h4>
+      <ul>
+        <li><b>Season</b> — each species has a monthly fruiting curve (morels peak in April–May, oysters run through autumn).</li>
+        <li><b>Habitat</b> — weighted hotspots where the species is classically found (heath &amp; conifers for chanterelles, beech woods for hedgehogs, chalk downland for field mushrooms…).</li>
+        <li><b>Climate</b> — a gentle latitude adjustment.</li>
+        <li>It is a <b>model estimate, not field reports</b> — treat it as a guide to when and where to look, not a guarantee.</li>
+      </ul>
+      <h4>Foraging responsibly</h4>
+      <ul>
+        <li><b>Always confirm identification</b> with more than one reliable source before eating anything. Mis-ID is the real risk in the wild.</li>
+        <li>Log only mushrooms you have actually found, and only species you're sure of.</li>
+        <li>Check landowner permission, stay off SSSIs, and follow local rules on public rights of way.</li>
+        <li>Take a little, leave the mycelium alive — the mushrooms you don't pick are next year's.</li>
+      </ul>
+      <h4>Your data</h4>
+      <p>Everything you log is stored only on this device (browser storage). Nothing is uploaded.</p>
+      <div class="dlgbtns">
+        <button class="btn" id="btnInstall">Install app</button>
+        <button class="btn primary" id="btnCloseInfo">Close</button>
+      </div>
+      <p class="credit">Coastline &amp; boundary: OpenStreetMap contributors (ODbL) + Natural Earth. Chance model: in-app estimate.</p>
+    </div>
+  </dialog>
+
+  <dialog id="guideDlg">
+    <div class="dlg">
+      <h2>
+        <svg width="26" height="26" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="14" fill="#2f5233"/>
+          <path d="M32 12c-13 0-21 9-21 17 0 1.6 1.2 3 2.9 3h36.2c1.7 0 2.9-1.4 2.9-3 0-8-8-17-21-17z" fill="#cf3f2e"/>
+          <circle cx="23" cy="22" r="2.6" fill="#fff4e0"/><circle cx="37" cy="19" r="2.2" fill="#fff4e0"/><circle cx="44" cy="25" r="2" fill="#fff4e0"/>
+          <path d="M25 33h14l-2 16c-.3 2.4-2.3 4-4.8 4h-2.4c-2.5 0-4.5-1.6-4.8-4z" fill="#f2e8d5"/>
+        </svg>
+        Field guide
+      </h2>
+      <div id="guideBody"></div>
+      <div class="dlgbtns">
+        <button class="btn primary" id="btnCloseGuide">Close</button>
+      </div>
+      <p class="credit">Identification is your responsibility — use multiple guides and be conservative. Local records: check <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a> for verified sightings near you.</p>
+    </div>
+  </dialog>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
