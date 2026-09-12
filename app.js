@@ -258,7 +258,8 @@ const svg = $('map'), world = $('world'), land = $('land'),
   hexLayer = $('hexLayer'), spotLayer = $('spotLayer'), homeMarker = $('homeMarker'),
   mapWrap = $('mapWrap'), tipEl = $('hexTip'), toastEl = $('toast'),
   spotCard = $('spotCard'), formEl = $('spotForm'), formBack = $('formBack'),
-  bannerEl = $('addBanner');
+  bannerEl = $('addBanner'), tileLayer = $('tileLayer'), inatLayer = $('inatLayer'),
+  ringLayer = $('ringLayer'), tileCreditEl = $('tileCredit');
 
 svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 land.setAttribute('d', D.path);
@@ -295,12 +296,13 @@ function applyView() {
   if (!locMarker.classList.contains('hidden') && locMarker.dataset.x) {
     locMarker.setAttribute('transform', `translate(${locMarker.dataset.x} ${locMarker.dataset.y}) scale(${s})`);
   }
-  spotLayer.querySelectorAll('.marker').forEach(m => {
+  [...spotLayer.querySelectorAll('.marker'), ...inatLayer.querySelectorAll('.marker')].forEach(m => {
     m.setAttribute('transform', `translate(${m.dataset.x} ${m.dataset.y}) scale(${s})`);
   });
+  scheduleTiles();
 }
 function setView(x, y, k, ax, ay) {
-  k = clamp(k, 1, 10);
+  k = clamp(k, 1, 40);
   if (ax !== undefined) {
     const wx = (ax - x) / view.k, wy = (ay - y) / view.k;
     x = ax - wx * k;
@@ -318,6 +320,70 @@ function clientToView(cx, cy) {
   const inv = ctm.inverse();
   return [inv.a * cx + inv.c * cy + inv.e, inv.b * cx + inv.d * cy + inv.f];
 }
+
+/* ---------------- OSM street tiles (street-level zoom) ---------------- */
+let osmOn = true;
+let tileEls = new Map();
+let tileRaf = 0;
+const raf = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : cb => setTimeout(cb, 0);
+function latToTileY(lat, z) {
+  const r = lat * Math.PI / 180;
+  return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z);
+}
+function lonToTileX(lon, z) { return Math.floor((lon + 180) / 360 * 2 ** z); }
+function updateTiles() {
+  if (tileCreditEl) tileCreditEl.classList.toggle('hidden', !osmOn);
+  svg.classList.toggle('tiles-on', osmOn);
+  if (!osmOn || view.k < 1.6) {
+    if (tileEls.size) { tileEls.forEach(img => img.remove()); tileEls.clear(); }
+    return;
+  }
+  const wx0 = (0 - view.x) / view.k, wy0 = (0 - view.y) / view.k;
+  const wx1 = (W - view.x) / view.k, wy1 = (H - view.y) / view.k;
+  const [lonW, latN] = toLonLat(Math.min(wx0, wx1), Math.min(wy0, wy1));
+  const [lonE, latS] = toLonLat(Math.max(wx0, wx1), Math.max(wy0, wy1));
+  let z = clamp(Math.round(Math.log2(156.25 * view.k)), 4, 16);
+  let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+  for (;;) {
+    const z2 = 2 ** z;
+    x0 = clamp(lonToTileX(lonW, z), 0, z2 - 1);
+    x1 = clamp(lonToTileX(lonE, z), 0, z2 - 1);
+    y0 = clamp(latToTileY(latN, z), 0, z2 - 1);
+    y1 = clamp(latToTileY(latS, z), 0, z2 - 1);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 48 || z <= 4) break;
+    z--;
+  }
+  const z2 = 2 ** z;
+  const keep = new Set();
+  for (let x = x0; x <= x1; x++) {
+    for (let y = y0; y <= y1; y++) {
+      const key = z + '/' + x + '/' + y;
+      keep.add(key);
+      if (tileEls.has(key)) continue;
+      const img = document.createElementNS(NS, 'image');
+      const lonT = x / z2 * 360 - 180, lonR = (x + 1) / z2 * 360 - 180;
+      const latT = (2 * Math.atan(Math.exp(Math.PI * (1 - 2 * y / z2))) - Math.PI / 2) * 180 / Math.PI;
+      const latBo = (2 * Math.atan(Math.exp(Math.PI * (1 - 2 * (y + 1) / z2))) - Math.PI / 2) * 180 / Math.PI;
+      img.setAttribute('x', ((lonT - LONL) * S + PAD).toFixed(2));
+      img.setAttribute('y', ((MERC_TOP - mercDeg(latT)) * S + PAD).toFixed(2));
+      img.setAttribute('width', ((lonR - lonT) * S).toFixed(2));
+      img.setAttribute('height', ((mercDeg(latT) - mercDeg(latBo)) * S).toFixed(2));
+      const u = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+      img.setAttribute('href', u);
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', u);
+      img.setAttribute('preserveAspectRatio', 'none');
+      tileLayer.appendChild(img);
+      tileEls.set(key, img);
+    }
+  }
+  for (const [key, img] of [...tileEls]) if (!keep.has(key)) { img.remove(); tileEls.delete(key); }
+}
+function scheduleTiles() { if (!tileRaf) tileRaf = raf(() => { tileRaf = 0; updateTiles(); }); }
+$('btnTiles').addEventListener('click', () => {
+  osmOn = !osmOn;
+  $('btnTiles').classList.toggle('on', osmOn);
+  updateTiles();
+});
 
 /* pointer pan / pinch / tap */
 const pointers = new Map();
@@ -349,7 +415,7 @@ svg.addEventListener('pointermove', e => {
     const nd = Math.hypot(a.x - b.x, a.y - b.y);
     const mid = [(a.x + b.x) / 2, (a.y + b.y) / 2];
     const [vx, vy] = clientToView(mid[0], mid[1]);
-    setView(view.x, view.y, clamp(pinch.k * nd / pinch.d, 1, 10), vx, vy);
+    setView(view.x, view.y, clamp(pinch.k * nd / pinch.d, 1, 40), vx, vy);
   }
 });
 function endPointer(e) {
@@ -495,7 +561,9 @@ function renderDetail() {
       <b style="color:var(--amber)">Look for:</b> ${GUIDES[sp.id].look}
       <div style="margin-top:6px"><a href="https://www.inaturalist.org/search?q=${encodeURIComponent(GUIDES[sp.id].inat)}"
         target="_blank" rel="noopener" style="color:var(--green-2);font-weight:600">Verified records near you: iNaturalist ↗</a></div>
-    </div>`;
+    </div>
+    <button class="btn inat" id="btnInat" type="button">📡 Pin real finds on the map (iNaturalist)</button>
+    ${inatFinds.length ? `<div class="inathint">${inatFinds.length} verified pin${inatFinds.length > 1 ? 's' : ''} on the map — tap a diamond. <a href="#" id="btnInatClear">Clear pins</a></div>` : ''}`;
 }
 function renderMonthStrip() {
   const box = $('monthStrip');
@@ -514,6 +582,15 @@ function renderAll() {
   renderPicks();
   renderChips();
   renderDetail();
+  const bi = $('btnInat');
+  if (bi) bi.addEventListener('click', () => fetchInat(selSpecies));
+  const bic = $('btnInatClear');
+  if (bic) bic.addEventListener('click', e => {
+    e.preventDefault();
+    inatFinds = [];
+    renderInat();
+    renderDetail();
+  });
   renderMonthStrip();
   renderNearYou();
   if (spotCard && !spotCard.classList.contains('hidden')) {
@@ -588,8 +665,25 @@ function renderSpots() {
        <circle cx="2.4" cy="-5.6" r="1.4" fill="#fff" opacity="0.9"/>`;
     spotLayer.appendChild(g);
   });
+  renderRings();
   $('findCount').textContent = finds.length ? `(${finds.length})` : '';
   renderFindsList();
+}
+/* precision rings — true 60 m ground radius per logged find (visible when zoomed in) */
+function renderRings() {
+  if (!ringLayer) return;
+  ringLayer.innerHTML = '';
+  const r = (60 / 110574) * S;
+  finds.forEach(f => {
+    const [x, y] = toXY(f.lon, f.lat);
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', x.toFixed(3));
+    c.setAttribute('cy', y.toFixed(3));
+    c.setAttribute('r', r.toFixed(4));
+    c.setAttribute('class', 'ring');
+    c.setAttribute('vector-effect', 'non-scaling-stroke');
+    ringLayer.appendChild(c);
+  });
 }
 function renderFindsList() {
   const box = $('findsList');
@@ -609,7 +703,7 @@ function renderFindsList() {
       <span class="fconf">${CONF[f.conf] || ''}</span>`;
     b.addEventListener('click', () => {
       const [x, y] = toXY(f.lon, f.lat);
-      const k = Math.max(view.k, 3.2);
+      const k = Math.max(view.k, 10);
       setView(W / 2 - k * x, H / 2 - k * y, k);
       showSpotPopup(f);
     });
@@ -647,6 +741,95 @@ function hideSpotCard() {
   openSpotId = null;
 }
 
+/* ---------------- real finds (iNaturalist verified observations) ---------------- */
+let inatFinds = []; // {id, spId, lat, lon, date, user, place, d}
+let inatLoading = false;
+async function fetchInat(spId) {
+  const sp = spById(spId);
+  const g = GUIDES[spId];
+  if (!g || inatLoading) return;
+  inatLoading = true;
+  const base = userLoc || { lat: D.barnsley[0], lon: D.barnsley[1] };
+  toast('Loading verified finds…');
+  const dLat = 1.2, dLon = 1.8;
+  const url = `https://api.inaturalist.org/v1/observations?taxon_name=${encodeURIComponent(g.inat)}` +
+    `&ne_lat=${(base.lat + dLat).toFixed(3)}&ne_lng=${(base.lon + dLon).toFixed(3)}` +
+    `&sw_lat=${(base.lat - dLat).toFixed(3)}&sw_lng=${(base.lon - dLon).toFixed(3)}` +
+    `&per_page=100&order_by=created_at&order=desc`;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    inatFinds = (j.results || [])
+      .filter(o => o.taxon && String(o.taxon.name).toLowerCase() === g.inat.toLowerCase())
+      .map(o => {
+        let lat = null, lon = null;
+        if (o.geojson && o.geojson.type === 'Point' && Array.isArray(o.geojson.coordinates)) {
+          lon = o.geojson.coordinates[0]; lat = o.geojson.coordinates[1];
+        } else if (typeof o.location === 'string' && o.location.includes(',')) {
+          const p = o.location.split(',').map(parseFloat);
+          if (p.length === 2 && isFinite(p[0]) && isFinite(p[1])) { lat = p[0]; lon = p[1]; }
+        }
+        return {
+          id: o.id, spId, lat, lon,
+          date: o.observed_on || '', user: (o.user && o.user.login) || 'iNaturalist',
+          place: o.place_guess || '', obscured: !!o.obscured,
+        };
+      })
+      .filter(o => o.lat != null && o.lon != null && Math.abs(o.lat) > 1)
+      .map(o => ({ ...o, d: distKm(base.lat, base.lon, o.lat, o.lon) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 30);
+    renderInat();
+    if (inatFinds.length) {
+      toast(`${inatFinds.length} verified ${sp.name} find${inatFinds.length > 1 ? 's' : ''} pinned (nearest first)`);
+    } else {
+      toast(`No verified ${sp.name} finds in this area yet — be the first to log one`);
+    }
+  } catch (e) {
+    toast('iNaturalist lookup failed — check connection');
+  } finally {
+    inatLoading = false;
+  }
+}
+function renderInat() {
+  if (!inatLayer) return;
+  inatLayer.innerHTML = '';
+  const s = 1 / view.k;
+  inatFinds.forEach(o => {
+    const sp = spById(o.spId);
+    const [x, y] = toXY(o.lon, o.lat);
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('class', 'marker imk');
+    g.style.cursor = 'pointer';
+    g.dataset.x = x; g.dataset.y = y; g.dataset.inat = o.id;
+    g.setAttribute('transform', `translate(${x} ${y}) scale(${s})`);
+    g.innerHTML =
+      `<circle r="15" fill="rgba(0,0,0,0)"/>
+       <path d="M0 -9.5 L9.5 0 L0 9.5 L-9.5 0 Z" fill="${sp.color}" stroke="#1c4f72" stroke-width="1.8"/>
+       <circle r="3.2" fill="#fffdf7"/>`;
+    inatLayer.appendChild(g);
+  });
+}
+function showInatPopup(o) {
+  const sp = spById(o.spId);
+  openSpotId = null;
+  spotCard.innerHTML = `
+    <h3><span class="dot" style="background:${sp.color};width:14px;height:14px"></span>${sp.name} — real find</h3>
+    <div class="srow"><b>${esc(o.place || regionName(o.lat, o.lon))}</b>${o.date ? ' · seen ' + esc(o.date) : ''}</div>
+    <div class="srow">Logged by <b>${esc(o.user)}</b> on iNaturalist ${o.obscured ? 'at an approximate position (recent records are privacy-protected)' : 'at the reported position'} · about ${Math.round(o.d * 0.6214)} mi from your base.</div>
+    <div class="srow" style="color:var(--muted)">This is a verified record, not a live mushroom — walk the habitat around the pin. Data: iNaturalist, CC BY-NC.</div>
+    <div class="sbtns">
+      <a class="btn" href="https://www.inaturalist.org/observations/${o.id}" target="_blank" rel="noopener">View on iNaturalist</a>
+      <button class="btn" id="spotClose">Close</button>
+    </div>`;
+  spotCard.classList.remove('hidden');
+  $('spotClose').addEventListener('click', hideSpotCard);
+  const [x, y] = toXY(o.lon, o.lat);
+  const k = Math.max(view.k, 12);
+  setView(W / 2 - k * x, H / 2 - k * y, k);
+}
+
 /* ---------------- add-spot flow ---------------- */
 function setAddMode(on) {
   addMode = on;
@@ -662,9 +845,15 @@ function clearPreview() {
 }
 function onTap(cx, cy) {
   const el = document.elementFromPoint(cx, cy);
+  const imk = el && el.closest ? el.closest('.imk') : null;
   const marker = el && el.closest ? el.closest('.marker') : null;
   const hex = el && el.closest ? el.closest('.hex') : null;
 
+  if (imk) {
+    const o = inatFinds.find(x => String(x.id) === imk.dataset.inat);
+    if (o) { hideTip(); showInatPopup(o); }
+    return;
+  }
   if (addMode) {
     const [vx, vy] = clientToView(cx, cy);
     const wx = (vx - view.x) / view.k, wy = (vy - view.y) / view.k;
@@ -911,7 +1100,7 @@ function renderNearYou() {
     b.addEventListener('click', () => {
       const lat = parseFloat(b.dataset.lat), lon = parseFloat(b.dataset.lon);
       const [x, y] = toXY(lon, lat);
-      const k = Math.max(view.k, 3.4);
+      const k = Math.max(view.k, 8);
       setView(W / 2 - k * x, H / 2 - k * y, k);
     });
   });
@@ -1018,3 +1207,4 @@ renderMonthStrip();
 renderAll();
 renderSpots();
 homeView();
+updateTiles();
