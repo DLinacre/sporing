@@ -131,7 +131,7 @@ docs/       README banner & map renders
 ```
 
 - **Run locally:** `cd sporing && python3 -m http.server 8080` → http://localhost:8080
-- **Tests:** jsdom smoke suite (rendering, species/month switching, log/popup/delete flow, postcode & rain fallbacks, out-of-England guard, street tiles, street-zoom clamp, precision rings, iNaturalist real-finds) — 62 assertions.
+- **Tests:** jsdom smoke suite (rendering, species/month switching, log/popup/delete flow, postcode & rain fallbacks, out-of-England guard, street tiles, street-zoom clamp, precision rings, iNaturalist real-finds + URL regression) — 63 assertions.
 
 ### Updating the England geometry
 
