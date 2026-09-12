@@ -753,8 +753,8 @@ async function fetchInat(spId) {
   toast('Loading verified finds…');
   const dLat = 1.2, dLon = 1.8;
   const url = `https://api.inaturalist.org/v1/observations?taxon_name=${encodeURIComponent(g.inat)}` +
-    `&ne_lat=${(base.lat + dLat).toFixed(3)}&ne_lng=${(base.lon + dLon).toFixed(3)}` +
-    `&sw_lat=${(base.lat - dLat).toFixed(3)}&sw_lng=${(base.lon - dLon).toFixed(3)}` +
+    `&nelat=${(base.lat + dLat).toFixed(3)}&nelng=${(base.lon + dLon).toFixed(3)}` +
+    `&swlat=${(base.lat - dLat).toFixed(3)}&swlng=${(base.lon - dLon).toFixed(3)}` +
     `&per_page=100&order_by=created_at&order=desc`;
   try {
     const r = await fetch(url);
