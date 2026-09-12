@@ -24,12 +24,17 @@ Pick a mushroom, pick a month — the map paints England in hexes coloured by **
 **Features**
 
 - 🗺️ **Chance hex map of England only** — pan/zoom/pinch, offline (real OSM + Natural Earth coastline)
+- 🛣️ **Street-level zoom** — the map can zoom to ~3 m/pixel with **OpenStreetMap street tiles** under the model layer (🗺️ toggle). Tiles are cached for offline use, so once an area has loaded you can walk its lanes without signal.
+- 🎯 **Precise real finds** — **📡 "Pin real finds on the map"** pulls verified iNaturalist observations of the selected species around your base and pins their **actual reported coordinates** as diamonds (nearest first, tap for date, observer and a link to the record). Recent privacy-protected records are flagged as approximate.
+- ⭕ **Precision rings on your pins** — every find you log carries a true ~60 m ground-radius ring, visible when you zoom to street level, so you know exactly where *you* found it.
 - 📍 **Home pin at Barnsley** — plus "Near Barnsley (≤ 25 mi)" chance list in the panel
-- 🧭 **Nearest spots to you** — use your GPS location **or a UK postcode** (Postcodes.io); see your closest logged finds and the best model ground for the selected species with bearing + distance, and one-tap "Go" to fly the map there
+- 🧭 **Nearest spots to you** — use your GPS location **or a UK postcode** (Postcodes.io); see your closest logged finds and the best model ground for the selected species with bearing + distance, and one-tap "Go" to fly the map there (lands at street zoom)
 - 🌧️ **Rain-window tracker** — checks the last 10 days of rain (Open-Meteo, no key) and tells you whether you're inside the fruiting window for the area, with a forecast nudge when the next heavy rain is coming
 - 📖 **Field guide in-app** — per-species ID points, where/when to look, **toxic look-alike warnings**, and "when to go" rules that actually work
 - 🔍 **iNaturalist deep-links** — jump from any species to verified public records near you (the real sightings database)
 - 📓 **Private find logging** — drop a pin where you found something (date, note, ID confidence). Stored only on-device; every pin shows its current model chance. Delete anytime.
+
+> **How to find a place to walk (the workflow):** set your location/postcode → check the rain card → "Pin real finds" for the in-season species → tap the nearest diamonds → walk the habitat the guide says to walk. Real pins tell you *a patch has produced before*; your own rings tell you *exactly where you found them*.
 
 ## Install on your phone
 
@@ -107,9 +112,10 @@ Full version is in the in-app 📖 guide. The non-negotiables:
 
 ## Data & credits
 
-- Coasters & boundary: **OpenStreetMap contributors** (ODbL) + **Natural Earth** (public domain). England cut from the UK outline along the home borders.
+- Coastline & boundary: **OpenStreetMap contributors** (ODbL) + **Natural Earth** (public domain). England cut from the UK outline along the home borders.
+- Street tiles: **OpenStreetMap** contributors, served from `tile.openstreetmap.org` (attribution shown in-app; usage per OSM tile policy — personal project, low volume, tiles cached on-device).
 - Rain: **Open-Meteo** (free, no key). Postcodes: **Postcodes.io** (free).
-- Local records to cross-check: **iNaturalist** (CC-BY).
+- Verified find locations: **iNaturalist** observation API — data licensed **CC BY-NC 4.0** by iNaturalist and contributors; non-commercial use, attribution shown in-app.
 - Chance model: this project (see "How the chance is calculated").
 
 ## Tech
@@ -119,13 +125,13 @@ Static PWA — no backend, no build step, no dependencies.
 ```
 index.html  app.js  style.css     UI + all logic
 data.js     791 hexes + England geometry (pre-projected Web-Mercator px)
-sw.js       service worker — full offline shell (cache-first)
+sw.js       service worker — full offline shell + bounded OSM tile cache
 manifest    PWA manifest + icons (incl. maskable)
 docs/       README banner & map renders
 ```
 
 - **Run locally:** `cd sporing && python3 -m http.server 8080` → http://localhost:8080
-- **Tests:** jsdom smoke suite (rendering, species/month switching, log/popup/delete flow, postcode & rain fallbacks, out-of-England guard) — 49 assertions.
+- **Tests:** jsdom smoke suite (rendering, species/month switching, log/popup/delete flow, postcode & rain fallbacks, out-of-England guard, street tiles, street-zoom clamp, precision rings, iNaturalist real-finds) — 62 assertions.
 
 ### Updating the England geometry
 
